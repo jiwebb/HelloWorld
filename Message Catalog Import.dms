@@ -1,0 +1,7 @@
+-- Jimmy Webb (SCI)
+-- Message Catalog
+
+set log    C:\TEMP\Message_Catalog_import.log;
+set input  C:\TEMP\Message_Catalog_export.dat;
+
+IMPORT *;

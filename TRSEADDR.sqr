@@ -1,0 +1,1699 @@
+!***********************************************************************
+!  TRSEADDR :  TRS ELECTRONIC FILE FOR MD RECORDS                      *
+!***********************************************************************
+!***********************************************************************
+!                                                                      *
+!               Confidentiality Information:                           *
+!                                                                      *
+! This module is the confidential and proprietary information of       *
+! PeopleSoft, Inc.; it is not to be copied, reproduced, or transmitted *
+! in any form, by any means, in whole or in part, nor is it to be used *
+! for any purpose other than that for which it is expressly provided   *
+! without the written permission of PeopleSoft.                        *
+!                                                                      *
+! Copyright (c) 1988-1998 PeopleSoft, Inc. All Rights Reserved         *
+!                                                                      *
+!***********************************************************************
+!***********************************************************************
+!Comments:   This interface loads in the Time and Attendance data to   *
+!            the generated paysheets for Semimonthly payrolls.         *
+!                                                                      *
+!************************************************************************
+!
+!************************************************************************
+! T A B L E S / V I E W S    R E F E R E N C E D                        *
+!************************************************************************
+! TABLE/VIEW NAME:       ALIAS:          USAGE:                         *
+!                                                                       *
+! PS_PAY_CHECK				A                  READ                     *
+! PS_NAMES                  B                  READ                     *
+! PS_PAY_DEDUCTION			C                  READ                     *
+! PS_PERSONAL_DATA			D                  READ                     *
+! PS_PAY_CALENDAR           E                  READ                     *
+!************************************************************************
+
+
+#include 'setenv.sqc'    !Set environment
+!#Include 'setup01.sqc'   !Printer and page-size initialization
+
+! C001   09/10/2004   EBD                                               *
+!  ADD THE '40' RECORD TO CREATE FOR ALL EMPLOYEES FOR THE NEW FISCAL   *
+!   YEAR.                                                               *
+!                                                                       *
+! C002   01/10/2005   EBD
+!  COMPARE THE HIRE DATE TO THE CURRENT MONTH THAT YOU ARE RUNNING THE  *
+!  REPORT FOR. 			 					  	   	   	   		   		*
+!  ADD THE PS_ADDRESS TABLE TO GET THE ADDRESS                          * 	
+!  	   	   			  		   	   	   									*
+! C003   03/15/2005  EBD												*
+!  ADD LOGIC TO DETERMINE THE ACTUAL NUMBER OF DAYS PAID IF YOU ARE     *
+!  TERMINATED.			  	  		 		   			 				*	
+!  																		*
+! C004   09/12/2005  EBD												*
+!  MOVE 'SLN' PAYGROUP TO LET $SALARY_FLAG TO BE 'S' FOR SALARY         *
+!                                                                       *
+! C004   10/05/2005  EBD                                                *
+! ADD $TERM_FLAG                                                        *
+! 	  																	*
+!  C005  03/02/2006														*
+!  REPLACE THE CHECK_DT TO THE PAY_END_DT TO SELECT RECORDS             *
+!  		   	   			   	   			  	 							*
+!  C006	 04/13/2006  EBD												*
+!  ADD  FIELDS $TERM_BEGIN_DT                                           *
+!              $TERM_END_DT                                             *
+!              $TERM_BEGIN_DATE
+! 
+! C007  ebd 01/27/2009  												*
+!        ADD PATH let $local-file-path = 'E:\PSFT\'	                  *
+! 		   	   			   	   			  	 							*
+!************************************************************************
+! Report Section
+!************************************************************************
+!DISPLAY 'Start Begin-Report...'          !These start/end show statements are
+!DISPLAY ''                               !very good for tracing program flow
+                                          !when debugging.  Just turn them on
+                                          !and off by removing or adding the
+                                          !exclamation mark
+
+
+begin-setup
+ declare-layout default
+  left-margin=0	top-margin=0
+  max-lines=10000
+  max-columns=200	formfeed=no
+ end-declare
+end-setup
+
+!begin-report
+!  do Init-Report
+!  do Process-Main
+!  do Stdapi-Term
+!end-report
+
+begin-program
+  do Init-Report
+  
+   show '**************************************************'
+   show 'Program : ' $reportid  ' - ' $reporttitle
+   show 'Began   : ' $asoftoday ' - ' $asofnow
+   show '**************************************************'
+   
+  do PROCESS-MAIN
+  DO GET_PERSONAL_DATA
+  DO GET_PERSONNEL
+  DO GET_CITIZENSHIP
+  DO GET_ADDRESS
+ ! DO PROCESS_IPEDSSCODE
+  DO GET_DATES
+  !DO READ_JOB
+  DO GET_SAVINGS_PLAN
+ !COMMENT OUT THE $BEG_DATE_WORK1 FOR THE FIRST MONTH TO GET EVERYON IN THE FILE  03/03/2004 
+ ! IF $BEG_DATE_WORK1 >= $FIS_BEGIN_DATE1 !AND $HIRE_DT <= $FIS_END_DATE1  
+ ! IF $HIRE_DT >= $BEG_DATE_WORK !AND $HIRE_DT <= $END_DATE_WORK
+ ! IF $HIRE_DT >= $FIS_BEGIN_DATE1 AND $HIRE_DT <= $FIS_END_DATE1 	 			C002
+   SHOW '$TRS_DATE1= ' $TRS_DATE1
+   SHOW '$CUR_BEGIN_DATE= ' $CUR_BEGIN_DATE
+   SHOW '$CUR_END_DATE= ' $CUR_END_DATE
+!  IF $TRS_DATE1 >= $CUR_BEGIN_DATE AND $TRS_DATE1 <= $CUR_END_DATE				!C002
+!     DO REPORT_WRITE_MD20_RECORD   !MD20 RECORD
+!     DO REPORT_WRITE_MD30_RECORD   !MD30 RECORD
+!     DO REPORT_WRITE_MD40_RECORD   !MD40 RECORD
+!	 LET $TRS_PRINT = 'Y'		   		 		  	 							!C002
+!  END-IF
+  
+!  SHOW 'ADDR_DATE..=' $ADDR_DATE
+!  IF $ADDR_DATE >= $CUR_BEGIN_DATE AND $ADDR_DATE <= $CUR_END_DATE				!C002
+!     IF $TRS_PRINT = 'Y'			   	   			  	 						!C002
+!	 ELSE   		  															!C002
+       DO REPORT_WRITE_MD30_RECORD   !MD30 RECORD	  	 						C002
+!	 END-IF 						   		 									!C002
+!  END-IF						   		 										!C002
+  	 
+	IF $BEGIN_DATE1 = '09'		   		 	   	  		   	 		 			!C001
+	  SHOW 'MONTH IS NEW YEAR....' $BEGIN_DATE1
+	  IF $HIRE_DT >= $FIS_BEGIN_DATE1 AND $HIRE_DT <= $FIS_END_DATE1			!C001
+	  ELSE		  	 				  	  		   	  							!C001
+	     DO REPORT_WRITE_MD40_RECORD   !MD40 RECORD								!C001
+	  END-IF						   		 									!C001
+	END-IF  																	!C001 
+  
+!  IF $TERM_DATE_MMDDYYYY >= $BEGIN_DATE AND $TERM_DATE_MMDDYYYY <= $END_DATE
+!  IF $TERM_DATE1 >= $CUR_BEGIN_DATE AND $TERM_DATE1 <= $CUR_END_DATE
+!	    DO REPORT_WRITE_MD90_RECORD   !MD90 RECORD
+!  END-IF	
+   IF $TERM_FLAG = 'Y' !AND $TERM_DATE_MMDDYYYY <= $TERM_END_DT
+	 IF $TERM_DATE >= $TERM_BEGIN_DT AND $TERM_DATE <= $TERM_END_DT
+	    DO REPORT_WRITE_MD90_RECORD   !MD90 RECORD
+	 END-IF	
+    END-IF
+  !do Close-Files
+  
+  SHOW '.......................................'
+  SHOW ' '
+  SHOW '#RECORD_20_CNT =' #RECORD_20_CNT 
+  SHOW '#RECORD_30_CNT =' #RECORD_30_CNT 
+  SHOW '#RECORD_40_CNT =' #RECORD_40_CNT 
+  SHOW '#RECORD_90_CNT =' #RECORD_90_CNT
+  SHOW '.......................................'
+  do Get-Current-DateTime
+
+   show ' '
+   show '**************************************************'
+   show 'Program : ' $reportid  ' - ' $reporttitle
+   show 'End     : ' $asoftoday ' - ' $asofnow
+   show '**************************************************'
+    
+  do Stdapi-Term
+end-program
+
+!DISPLAY show 'End Begin-Report...'
+!DISPLAY show ' '
+
+
+!************************************************************************
+! Procedure Init-Report
+!************************************************************************
+!show 'Start Init-Report...'
+!show '
+begin-procedure Init-Report
+
+  do Init-DateTime
+  do Init-Number
+  do Get-Current-DateTime
+  do Stdapi-Init
+  
+  do Initialization    !  If any... set variables, initialize arrays, etc 
+  !do Open-Files
+   let $reportid    = 'TRSEADDR'
+   let $reporttitle = 'TRS ELECTRONIC FILE FOR MD RECORDS'
+  
+end-procedure
+
+!************************************************************************
+!  Heading Section
+!************************************************************************
+begin-heading 1
+  LET #LINE_CNT = (#LINE_CNT - 1)
+ ! MOVE #LINE_CNT to $DOC_CNT 00000 ! Edit to include '0's padded to the left
+
+!LET #DOC_NUM_AMT = #EARNINGS
+!LET #DOC_NUM_AMT = #DOC_NUM_AMT*100*2
+!LET #DOC_NUM_AMT = ROUND(#DOC_NUM_AMT,0)
+!LET #DOC_NUM_AMT = TRUNC(#DOC_NUM_AMT,0)
+!LET $DOC_NUM_AMT = TO_CHAR(#DOC_NUM_AMT)
+!LET $DOC_NUM_AMT = LPAD($DOC_NUM_AMT,13,'0')
+  Do HEADER_WRITE 
+!  Do DOC_HEADER_WRITE
+
+end-heading
+
+!************************************************************************
+! Procedure Initialization
+!************************************************************************
+begin-procedure Initialization
+
+!BEGIN-SELECT
+!RUNCTL.RUN_ID
+!FROM PS_PAYSHEET_RUNCTL RUNCTL
+! WHERE RUNCTL.OPRID = $prcs_oprid
+!       AND RUNCTL.RUN_CNTL_ID = $prcs_run_cntl_id
+!END-SELECT
+
+!INPUT $BEGIN_DATE 'Enter Pay Period Begin Dt (MM-DD-YYYY) '
+!INPUT $END_DATE 'Enter Pay Period End Dt (MM-DD-YYYY) '
+	  if $Prcs_Process_Instance = ''
+      do Input-Parameters
+    else
+      do Select-Parameters
+      
+    end-if
+
+    do format-input-parameters
+	
+	LET $TRS_DISTRICT = '1899'
+	LET $REPORT_TYPE = 'MD'
+	LET $IDENT_CODE = 'S'
+	
+	LET #LINE=0
+
+END-PROCEDURE
+
+!************************************************************************
+!************************************************************************
+begin-procedure input-parameters
+
+   INPUT $PAY_BEGIN_DATE 'Enter Pay Period Begin Date (MM-DD-YYYY)'
+   INPUT $PAY_END_DATE 'Enter Pay Period End Date (MM-DD-YYYY)'
+   INPUT $FISCAL_BEGIN_DATE 'Enter Fiscal Year Begin Date (MM-DD-YYYY)' 
+   INPUT $FISCAL_END_DATE 'Enter Fiscal Year End Date (MM-DD-YYYY)'
+   INPUT $WORK_DAYS 'Enter The Number of Work Days In This Month'  	 	 		!C003
+   INPUT $FILENAME 'Enter Override Path and Filename (blank for default)'
+end-procedure input-parameters
+
+!************************************************************************
+!************************************************************************
+begin-procedure format-input-parameters
+
+   if $filename = ''
+!C007      let $local-file-path = 'P:\PAYROLL\THAYES'
+	let $local-file-path = 'E:\PSFT\PAYROLL\THAYES'				!C007
+	  let $local-file-name = 'TRSEADDR.txt'
+      let $filename = $local-file-path || $local-file-name
+   end-if
+
+   if $filename != ''									!C007
+      let $local-file-path = 'E:\PSFT\'						!C007
+      let $local-file-name = $filename						!C007
+      let $filename = $local-file-path || $local-file-name			!C007
+   end-if											!C007
+
+    SHOW '$PRCS_PROCESS_INSTANCE...' $PRCS_PROCESS_INSTANCE
+    SHOW '$PAY_BEGIN_DATE....' $PAY_BEGIN_DATE
+	SHOW '$PAY_END_DATE...' $PAY_END_DATE
+	SHOW '$FISCAL_BEGIN_DATE...' $FISCAL_BEGIN_DATE
+	SHOW '$FISCAL_END_DATE....'  $FISCAL_END_DATE
+	SHOW '$WORK_DAYS...' $WORK_DAYS
+	SHOW '$FILENAME...' $FILENAME
+	
+   if $Prcs_Process_Instance = '' 
+	 LET $BEGIN_DATE   = EDIT($PAY_BEGIN_DATE 'MM-DD-YYYY')
+     LET $END_DATE     = EDIT($PAY_END_DATE 'MM-DD-YYYY')
+	 LET $CUR_BEG_MON = SUBSTR($BEGIN_DATE,1,2)	 					 		!C002		
+	 LET $CUR_BEG_DD = SUBSTR($BEGIN_DATE,4,2)								!C002
+	 LET $CUR_BEG_YYYY = SUBSTR($BEGIN_DATE,7,4)							!C002
+	 LET $CUR_END_MON = SUBSTR($END_DATE,1,2)								!C002
+	 LET $CUR_END_DD = SUBSTR($END_DATE,4,2)								!C002
+	 LET $CUR_END_YYYY = SUBSTR($END_DATE,7,4)								!C002
+	 SHOW '$BEGIN_DATE= ' $BEGIN_DATE
+	 SHOW '$END_DATE= ' $END_DATE
+	 SHOW '$PAY_BEGIN_DATE= ' $PAY_BEGIN_DATE
+	 SHOW '$PAY_END_DATE= ' $PAY_END_DATE
+	 LET $FISCAL_BEGIN_DT = EDIT($FISCAL_BEGIN_DATE 'MM-DD-YYYY')
+	 LET $FISCAL_END_DT = EDIT($FISCAL_END_DATE 'MM-DD-YYYY')
+	 SHOW '$FISCAL_BEGIN_DT= ' $FISCAL_BEGIN_DT
+	 SHOW '$FISCAL_END_DT= ' $FISCAL_END_DT
+	 LET $FISCAL_BEG_MON =  SUBSTR($FISCAL_BEGIN_DATE,5,2)
+     LET $FISCAL_BEG_DD =  SUBSTR($FISCAL_BEGIN_DATE,7,2)
+     LET $FISCAL_BEG_YYYY =  SUBSTR($FISCAL_BEGIN_DATE,1,4)
+	 LET $FISCAL_END_MON =  SUBSTR($FISCAL_END_DATE,5,2)
+     LET $FISCAL_END_DD =  SUBSTR($FISCAL_END_DATE,7,2)
+     LET $FISCAL_END_YYYY =  SUBSTR($FISCAL_END_DATE,1,4)
+   ELSE
+     let $filename     = ltrim(rtrim($filename,' '),' ')
+     LET $BEGIN_DATE   = EDIT($PAY_BEGIN_DT 'MM-DD-YYYY')
+     LET $END_DATE     = EDIT($PAY_END_DT 'MM-DD-YYYY')
+	 LET $WORK_DAYS    = EDIT($DAYS '099')		 	  							!C003
+	 LET $CUR_BEG_MON = SUBSTR($BEGIN_DATE,1,2)	  					 			!C002 		
+	 LET $CUR_BEG_DD = SUBSTR($BEGIN_DATE,4,2)									!C002
+	 LET $CUR_BEG_YYYY = SUBSTR($BEGIN_DATE,7,4)								!C002
+	 LET $CUR_END_MON = SUBSTR($END_DATE,1,2)									!C002
+	 LET $CUR_END_DD = SUBSTR($END_DATE,4,2)									!C002
+	 LET $CUR_END_YYYY = SUBSTR($END_DATE,7,4)									!C002
+	 LET $FISCAL_BEGIN_DT = EDIT($FISCAL_BEGIN_DT 'MM-DD-YYYY') !($BEGIN_DT 'MM-DD-YYYY')
+	 LET $FISCAL_END_DT = EDIT($FISCAL_END_DT 'MM-DD-YYYY')			!($END_DT 'MM-DD-YYYY')
+	 LET $FISCAL_BEG_MON =  SUBSTR($FISCAL_begin_dt,1,2)			!($begin_dt,1,2)
+     LET $FISCAL_BEG_DD =  SUBSTR($FISCAL_BEGIN_DT,4,2)				!($begin_dt,4,2)
+     LET $FISCAL_BEG_YYYY =  SUBSTR($FISCAL_BEGIN_DT,7,4)			!($begin_dt,7,4)
+	 LET $FISCAL_END_MON =  SUBSTR($FISCAL_END_DT,1,2)				!($END_dt,1,2)
+     LET $FISCAL_END_DD =  SUBSTR($FISCAL_END_DT,4,2)				!($END_dt,4,2)
+     LET $FISCAL_END_YYYY =  SUBSTR($FISCAL_END_DT,7,4)				!($END_dt,7,4)
+   end-if 	 
+
+   let $output-dir-with-filename = $filename
+   LET $CUR_BEGIN_DATE = $CUR_BEG_YYYY||$CUR_BEG_MON||$CUR_BEG_DD			  	!C002
+   LET $CUR_BEGIN_DATE1 = $CUR_BEG_MON||$CUR_BEG_DD||$CUR_BEG_YYYY
+   LET $CUR_END_DATE = $CUR_END_YYYY||$CUR_END_MON||$CUR_END_DD					!C002
+   LET $CUR_END_DATE1 = $CUR_END_MON||$CUR_END_DD||$CUR_END_YYYY
+   LET $CUR_END_DATE2 = $CUR_END_YYYY||'-'||$CUR_END_MON||'-'||$CUR_END_DD	
+   SHOW '$CUR_BEGIN_DATE =' $CUR_BEGIN_DATE
+   SHOW '$CUR_END_DATE =' $CUR_END_DATE
+   !LET $FISCAL_BEG_MON =  SUBSTR($begin_dt,1,2)
+   !LET $FISCAL_BEG_DD =  SUBSTR($begin_dt,4,2)
+   !LET $FISCAL_BEG_YYYY =  SUBSTR($begin_dt,7,4)
+   LET $FIS_BEGIN_DATE = $FISCAL_BEG_MON||$FISCAL_BEG_DD||$FISCAL_BEG_YYYY
+   LET $FIS_BEGIN_DATE1 = $FISCAL_BEG_YYYY||$FISCAL_BEG_MON||$FISCAL_BEG_DD
+   LET $FIS_BEGIN_DATE2 = $FISCAL_BEG_YYYY||'-'||$FISCAL_BEG_MON||'-'||$FISCAL_BEG_DD
+   SHOW '$FIS_BEGIN_DATE= ' $FIS_BEGIN_DATE
+   !LET $FISCAL_END_MON =  SUBSTR($END_dt,1,2)
+   !LET $FISCAL_END_DD =  SUBSTR($END_dt,4,2)
+   !LET $FISCAL_END_YYYY =  SUBSTR($END_dt,7,4)
+   LET $FIS_END_DATE = $FISCAL_END_MON||$FISCAL_END_DD||$FISCAL_END_YYYY
+   LET $FIS_END_DATE1 = $FISCAL_END_YYYY||$FISCAL_END_MON||$FISCAL_END_DD
+   LET $FIS_END_DATE2 = $FISCAL_END_YYYY||'-'||$FISCAL_END_MON||'-'||$FISCAL_END_DD
+   SHOW '$FIS_END_DATE= ' $FIS_END_DATE
+   LET $CUR_MON =  SUBSTR($begin_date,1,2)
+   LET $CUR_YYYY = 	SUBSTR($begin_date,7,4)
+   let $BEGIN_DATE1 = substr($BEGIN_DATE,1,2)										 
+    LET $CUR_MON=$BEGIN_DATE1  !&A.PAY_END_DT
+   IF $CUR_MON='09'
+	  LET $CUR_MON1='01'
+	 ! SHOW $CUR_MON
+   END-IF
+	IF $CUR_MON='10'
+	  LET $CUR_MON1='02'
+	  !SHOW $CUR_MON
+	END-IF
+	IF $CUR_MON='11'
+	  LET $CUR_MON1='03'
+	END-IF
+	IF $CUR_MON='12'
+	  LET $CUR_MON1='04'
+	END-IF 
+	IF $CUR_MON='01'
+	  LET $CUR_MON1='05'
+	END-IF
+	IF $CUR_MON='02'
+	  LET $CUR_MON1='06'
+	END-IF 
+	IF $CUR_MON='03'
+	  LET $CUR_MON1='07'
+	END-IF
+	IF $CUR_MON='04'
+	  LET $CUR_MON1='08'
+	END-IF
+	IF $CUR_MON='05'
+	  LET $CUR_MON1='09'
+	END-IF
+	IF $CUR_MON='06'
+	  LET $CUR_MON1='10'
+	END-IF
+	IF $CUR_MON='07'
+	  LET $CUR_MON1='11'
+	END-IF
+	IF $CUR_MON='08'
+	  LET $CUR_MON1='12'
+	END-IF
+
+	
+   show ' '
+   show '********** Input Parameters ***********'
+   show 'Begin Dt ====> ' $begin_date
+   show 'End Dt ======> ' $end_date
+   SHOW 'YEAR ========> ' $CUR_YYYY
+   show 'Filename ====> ' $Filename
+   SHOW 'WORK DAYS====> ' $WORK_DAYS 											!C003
+   show '***************************************'
+
+end-procedure format-input-parameters
+
+
+!************************************************************************
+! Procedure Open-files
+!************************************************************************
+begin-procedure Open-files
+  OPEN $filename AS 10   !'P:\DOWNLOAD\TRSEADDR_TEST.DAT' AS 10
+       FOR-WRITING
+	   RECORD=200:FIXED
+	   STATUS = #OPEN10
+	   IF #OPEN10 = -1
+	     show $filename ' DID NOT OPEN SUCCESSFULLY' !DISPLAY 'OPEN FOR FILE 10 FAILED'
+	   END-IF
+end-procedure !Open-Files
+
+!************************************************************************
+!************************************************************************
+begin-procedure Close-Files
+
+   close 10
+
+end-procedure Close-Files
+
+!************************************************************************
+! Procedure Process-Main
+!************************************************************************
+begin-procedure PROCESS-MAIN
+LET #LINE=2
+BEGIN-SELECT 
+A.SSN &SSN
+!UM(A.TOTAL_GROSS) &TOT_GRS
+C.DED_CUR &TOT_DED
+!SUM(C.DED_CUR) &TOT_DED
+!A.PAY_END_DT &WS_MONTH
+RTRIM(CONVERT(CHAR,A.PAY_END_DT,111))  &WS_MONTH
+!TO_CHAR(A.PAY_END_DT,'MM') &A.PAY_END_DT   04/18/2002  EB
+RTRIM(DATEPART(MONTH,A.PAY_END_DT)) &PAY_END_DT
+!TO_CHAR(A.PAY_END_DT,'YYYY-MM-DD')  04/18/2002   EB
+RTRIM(CONVERT(CHAR,A.PAY_END_DT,111))  
+!TO_CHAR(A.CHECK_DT,'YYYY-MM-DD')  04/18/2002  EB
+RTRIM(CONVERT(CHAR,A.CHECK_DT,111))
+RTRIM(CONVERT(CHAR,A.CHECK_DT,111)) &WS_CHECK_DT
+DATEDIFF(DAY,'2005-09-01',GETDATE()) &PAYDAYS
+!DATEDIFF(DAY,GETDATE(),DIF1.EFFDT
+B.LAST_NAME &LAST_NAME
+B.FIRST_NAME &FIRST_NAME
+B.MIDDLE_NAME &MIDDLE_NAME
+B.NAME_SUFFIX &NAME_SUFFIX
+A.TOTAL_GROSS &TOT_GRS
+A.COMPANY
+A.PAYGROUP
+A.PAY_END_DT 
+A.OFF_CYCLE
+A.PAGE_NUM
+A.LINE_NUM
+A.SEPCHK
+A.EMPLID
+A.EMPL_RCD
+!SUM(A.TOTAL_GROSS) &TOT_GRS
+!SUM(F.GRS_MTD) &TOT_GRS
+	
+	!show 'end-date= ' &A.PAY_END_DT
+	!SHOW 'MON= ' $CUR_MON
+	!do format-input-parameters
+	SHOW '$FIS_BEGIN_DATE2=' $FIS_BEGIN_DATE2
+	
+	SHOW '$CUR_END_DATE2=' $CUR_END_DATE2
+	
+	! let $FIS_BEGIN_DATE3 = strtodate($FIS_BEGIN_DATE2,{DTUDateFormat})
+    ! let $CUR_END_DATE3  = strtodate($CUR_END_DATE2,{DTUDateFormat})
+	 !SHOW '$FIS_BEGIN_DATE3=' $FIS_BEGIN_DATE3
+	 !SHOW '$CUR_END_DATE3=' $CUR_END_DATE3
+	 !do DIFF-DATE
+	 !do format-datetime($FIS_BEGIN_DATE2, $FIS_BEGIN_DATE3, {DEFCMP}, '', 'native')
+	 !do format-datetime($CUR_END_DATE2, $CUR_END_DATE3, {DEFCMP}, '', 'native')
+	 !LET #DATE_DIFF = trunc(datediff($FIS_BEGIN_DATE3,$CUR_END_DATE3,'Day'),0)
+	 !SHOW '#PAY_DAYS= ' &PAYDAYS   !#PAY_DAYS
+	 !LET #PAY_DAYS = &PAYDAYS
+	 !MOVE #PAY_DAYS TO $NUM_PAY_DAYS '000'
+   	 
+	
+	 IF #FLAG=0
+	   LET $EMPLID = &A.EMPLID
+	   LET $WS_SSN=&SSN
+	   LET $LAST_NAME=&LAST_NAME
+	   LET $FIRST_NAME=&FIRST_NAME
+	   LET $MIDDLE_NAME=&MIDDLE_NAME
+	   LET $GENERATION=&NAME_SUFFIX
+	   LET $COMPANY=&A.COMPANY
+       LET $PAYGROUP=&A.PAYGROUP
+       LET $PAY_END_DT=&A.PAY_END_DT 
+       LET $OFF_CYCLE=&A.OFF_CYCLE
+       LET $PAGE_NUM=&A.PAGE_NUM
+       LET $LINE_NUM=&A.LINE_NUM
+       LET $SEPCHK=&A.SEPCHK
+       LET $EMPL_RCD=&A.EMPL_RCD
+	   LET #LINE = 1
+	 !LET $CUR_MON='02'
+	   LET #FLAG=1
+	 END-IF  
+	
+!	DISPLAY &WS_MONTH 
+!	IF &WS_MONTH = '26-JUL-1997'
+	
+ !   IF &SSN='637185815'
+ !      SHOW 'SSN= ' &SSN
+	!   SHOW 'MONTH= ' &WS_CHECK_DT
+	!   SHOW 'DED= ' &TOT_DED
+	!   SHOW 'GROSS= ' &TOT_GRS
+	! END-IF
+	 IF ($WS_SSN<>&SSN)
+!	  DISPLAY &TOT_DED
+      SHOW 'MAIN=' $EMPLID
+      DO GET_PERSONNEL
+      DO GET_PERSONAL_DATA
+	  DO GET_CITIZENSHIP
+	  DO GET_ADDRESS
+	 ! DO PROCESS_IPEDSSCODE
+	  DO GET_DATES
+	 ! DO READ_JOB
+	  DO GET_SAVINGS_PLAN
+	  SHOW 'WRITE RECORD= '
+	  SHOW '$HIRE_DT= ' $HIRE_DT
+	  SHOW '$BEG_DATE_WORK= ' $BEG_DATE_WORK1
+	  SHOW '$fIS_BEGIN_DATE1= ' $FIS_BEGIN_DATE1
+	  SHOW 'TRS_DATE1= ' $TRS_DATE1
+	  SHOW '$CUR_BEGIN_DATE= ' $CUR_BEGIN_DATE
+      SHOW '$CUR_END_DATE= ' $CUR_END_DATE
+	  SHOW 'ADDR_DATE..=' $ADDR_DATE
+	 ! IF $HIRE_DT >= $BEG_DATE_WORK AND $HIRE_DT <= $END_DATE_WORK
+	 !COMMENT OUT THE $BEG_DATE_WORK1 FOR THE FIRST MONTH TO GET EVERYON IN THE FILE  03/03/2004
+	 !  IF $BEG_DATE_WORK1 >= $FIS_BEGIN_DATE1
+	 ! IF $HIRE_DT >= $FIS_BEGIN_DATE1 AND $HIRE_DT <= $FIS_END_DATE1	 		!C002
+!	  IF $TRS_DATE1 >= $CUR_BEGIN_DATE AND $TRS_DATE1 <= $CUR_END_DATE			!C002
+!         DO REPORT_WRITE_MD20_RECORD   !MD20 RECORD
+!	     DO REPORT_WRITE_MD30_RECORD   !MD30 RECORD
+!	     DO REPORT_WRITE_MD40_RECORD   !MD40 RECORD
+!		 LET $TRS_PRINT = 'Y'		   		 		  	 						!C002
+!	  END-IF	
+	  
+!	  IF $ADDR_DATE >= $CUR_BEGIN_DATE AND $ADDR_DATE <= $CUR_END_DATE			!C002
+!	    IF $TRS_PRINT = 'Y'			   	   			  	 						!C002
+!		ELSE		  															!C002
+         DO REPORT_WRITE_MD30_RECORD   !MD30 RECORD	  	 						C002
+!		END-IF 						   		 									!C002
+!      END-IF						   		 									!C002
+	  
+	    IF $BEGIN_DATE1 = '09'		   		 	   	  	  	 	 		 		!C001
+		   SHOW 'MONTH IS NEW YEAR....' $BEGIN_DATE1
+		   IF $HIRE_DT >= $FIS_BEGIN_DATE1 AND $HIRE_DT <= $FIS_END_DATE1		!C001
+	       ELSE		   	  				   	   			   						!C001
+		      DO REPORT_WRITE_MD40_RECORD   !MD40 RECORD						!C001
+		   END-IF								  								!C001  
+		END-IF 																	!C001  
+	  SHOW 'PRINT TERM RECORD=.........' $TERM_DATE_MMDDYYYY
+	  SHOW '$BEGIN_DATE=' $BEGIN_DATE
+	  SHOW '$END_DATE=' $END_DATE
+	  SHOW '$CUR_BEGIN_DATE=' $CUR_BEGIN_DATE
+	  SHOW '$CUR_END_DATE=' $CUR_END_DATE
+	  SHOW '$TERM_DATE=' $TERM_DATE
+	  SHOW '$CUR_BEGIN_DATE1=' $CUR_BEGIN_DATE1
+	  SHOW '$CUR_END_DATE1=' $CUR_END_DATE1
+	  SHOW '$TERM_DATE1=' $TERM_DATE1
+	  SHOW 'PRINT TERM RECORD EXIT...................'
+	 ! IF $TERM_DATE_MMDDYYYY >= $BEGIN_DATE AND $TERM_DATE_MMDDYYYY <= $END_DATE
+	 ! IF $TERM_DATE1 >= $CUR_BEGIN_DATE AND $TERM_DATE1 <= $CUR_END_DATE
+	 IF $TERM_FLAG = 'Y' !AND $TERM_DATE_MMDDYYYY <= $TERM_END_DT
+	  IF $TERM_DATE >= $TERM_BEGIN_DT AND $TERM_DATE <= $TERM_END_DT
+	    DO REPORT_WRITE_MD90_RECORD   !MD90 RECORD
+	  END-IF	
+	  SHOW 'PRINT TERMINATION RECORD...'
+     END-IF
+	    
+	 !   DO REPORT_WRITE_MD90_RECORD   !MD90 RECORD
+	 ! END-IF	
+	 ! DO REPORT_WRITE
+!      display #total_ded
+!	 ELSE 
+      LET $BIRTHDATE = '00000000'
+	   LET $CITIZENSHIP = ' '
+	   LET $SEX = ' ' 
+       LET $LAST_NAME = ' '  
+       LET $FIRST_NAME = ' '
+       LET $GENERATION = ' '
+       LET $MIDDLE_NAME = ' ' 
+	   LET $ADDRESS1 = ' '
+       LET $ADDRESS2 = ' '
+       LET $CITY = ' '
+       LET $STATE = ' '
+       LET $ZIP = ' '
+       LET $PHONE = ' '
+	   LET $TRS_DATE = ' '
+	   LET $ADDR_DATE = ' '
+	   LET $TRS_PRINT = 'N'
+	   LET #HIRE_PAYDAYS=000
+      LET $EMPLID = &A.EMPLID
+	  LET $WS_SSN=&SSN
+	  LET $LAST_NAME=&LAST_NAME
+	  LET $FIRST_NAME=&FIRST_NAME
+	  LET $MIDDLE_NAME=&MIDDLE_NAME
+	  LET $GENERATION=&NAME_SUFFIX
+	  LET $COMPANY=&A.COMPANY
+       LET $PAYGROUP=&A.PAYGROUP
+       LET $PAY_END_DT=&A.PAY_END_DT 
+       LET $OFF_CYCLE=&A.OFF_CYCLE
+       LET $PAGE_NUM=&A.PAGE_NUM
+       LET $LINE_NUM=&A.LINE_NUM
+       LET $SEPCHK=&A.SEPCHK
+       LET $EMPL_RCD=&A.EMPL_RCD
+	   
+       
+	!  let $tot_ded=&tot_ded
+	!  let $tot_grs=$tot_grs 
+	 END-IF
+	 SHOW '......................'
+	 SHOW 'MAIN=' $EMPLID
+	 show 'ssn= ' &ssn
+	 show 'ws-ssn= ' $ws_ssn
+	 SHOW '.....................'
+	
+	 let #tot_ded=#tot_ded + &tot_ded
+	  let #tot_grs=#tot_grs + &tot_grs 
+	  
+	  MOVE #TOT_GRS TO $TOT_GRS '0000000V00'
+	  
+	  DO GET_TRS_PAY_BACK_DEDUCTION
+	  
+	  
+	  
+	  
+!	END-IF 
+!    PS_PERSONAL_DATA D,
+!  PS_EARNINGS_BAL E 
+     FROM PS_PAY_CHECK A,
+	      PS_NAMES B,
+          PS_PAY_DEDUCTION C
+      	  !PS_PAY_CALENDAR D
+     WHERE A.EMPLID IN ('5817','5827','5819','5675','5823','5613','5818','5822')!,
+    !                    '5042','5662','5579','5306','5591','5490','5497','5474',
+	!					'5593','5586','5596','5659','5642','5168','5466','5609',
+	!					'5616','5601','5603','5605','5600','5633','5619','5652',
+	!					'5645','5602','5620','5469','5487','5477','5465','5476',
+	!					'5470','5599','5528','5523','5525','5111','5526','4650',
+	!					'5558','5532','5538','5119','5536','5588','5571','5521',
+	!					'5483','5493','5655','5606','5658','5649','5504','5506',
+	!					'5500','5387','5612','5585','5627','5632','5598','5540',
+	!					'5623','5484','5561','5481','5762','5760','5677','5758',
+	!					'5637')		  
+	 AND B.EMPLID=A.EMPLID
+		AND B.EFFDT = (SELECT MAX(B_ED.EFFDT) 
+		               FROM PS_NAMES B_ED
+                       WHERE B.EMPLID = B_ED.EMPLID
+                       AND B.NAME_TYPE = B_ED.NAME_TYPE
+                       AND B_ED.EFFDT <= GETDATE())    !SYSDATE) 04/18/02   EB 
+		  AND B.NAME_TYPE='PRI'
+		!AND A.PAY_END_DT <> '15-NOV-99'	
+	    AND A.COMPANY=C.COMPANY
+	  AND A.PAYGROUP=C.PAYGROUP
+      AND A.PAY_END_DT=C.PAY_END_DT
+		AND A.OFF_CYCLE=C.OFF_CYCLE
+		AND A.PAGE_NUM=C.PAGE_NUM
+		AND A.LINE_NUM=C.LINE_NUM
+		AND A.SEPCHK=C.SEPCHK
+		AND C.PLAN_TYPE='4X'
+!		AND C.PLAN_TYPE='10'
+		AND C.BENEFIT_PLAN='TRS'
+		AND C.DED_CLASS<>'P'	
+	!	AND B.EMPLID=D.EMPLID 																						  
+		!AND C.COMPANY=D.COMPANY
+		!AND C.PAYGROUP=D.PAYGROUP
+		!AND C.PAY_END_DT=D.PAY_END_DT
+		!AND D.PAY_CONFIRM_RUN='Y'
+		AND A.CHECK_DT >= $BEGIN_DATE   !TO_DATE($BEGIN_DATE,'MM-DD-YYYY')
+		AND A.CHECK_DT <= $END_DATE     !TO_DATE($END_DATE,'MM-DD-YYYY')
+		!AND A.PAY_END_DT >= TO_DATE($BEGIN_DATE,'MM-DD-YYYY')
+		!AND A.PAY_END_DT <= TO_DATE($END_DATE,'MM-DD-YYYY')
+		!AND D.CHECK_DT = '01-DEC-99'
+		!AND E.PAY_END_DT >= TO_DATE($BEGIN_DATE,'MM-DD-YYYY')
+		!AND E.PAY_END_DT <= TO_DATE($END_DATE,'MM-DD-YYYY')
+		!AND E.EMPLID=A.EMPLID
+		!AND E.ERNCD='TRS'
+		!AND E.BALANCE_QTR=4
+		!AND E.BALANCE_PERIOD=12  
+     ! GROUP BY A.SSN,B.LAST_NAME,B.FIRST_NAME,B.MIDDLE_NAME,
+	 !          A.TOTAL_GROSS,C.DED_CUR,A.PAY_END_DT,A.CHECK_DT  !D.GRS_MTD
+	  !ORDER BY A.SSN
+	  ORDER BY B.LAST_NAME,B.FIRST_NAME,B.MIDDLE_NAME
+END-SELECT
+end-procedure ! main
+
+!************************************************************************
+! Procedure GET_PERSONNEL
+!************************************************************************
+begin-procedure GET_PERSONNEL
+SHOW 'PERSONNEL'
+SHOW '$EMPLID=' $EMPLID
+BEGIN-SELECT 
+F1.EMPLID
+F1.IPEDSSCODE &IPEDSSCODE
+F1.FTE 
+F1.JOBCODE &JOBCODE
+F1.ANNUAL_RT
+F1.EMPL_STATUS
+F1.HOURLY_RT
+F1.PAYGROUP
+F1.FICA_STATUS_EE 
+
+   LET #FTE = &F1.FTE
+   MOVE #FTE TO $FTE '0V00'
+   SHOW '#FTE=' #FTE
+   SHOW '$FTE=' $FTE
+   SHOW 'FICA_STATUS_EE=' &F1.FICA_STATUS_EE
+    IF &F1.FICA_STATUS_EE = 'N'
+      LET $PAY_FICA= 'F'
+	END-IF 
+	IF &F1.FICA_STATUS_EE = 'E'
+      LET $PAY_FICA= 'N'
+	END-IF
+	IF &F1.FICA_STATUS_EE = 'M'
+      LET $PAY_FICA= 'M'
+	END-IF
+  ! LET $FTE = &H.FTE
+   LET $POS_CODE = '0X'
+   !SHOW 'EMPLID = ' &H.EMPLID
+   !SHOW 'IPEDSSCODE = ' &IPEDSSCODE
+   !SHOW 'JOBCODE = ' &JOBCODE
+   IF &IPEDSSCODE = '1' OR &IPEDSSCODE = '2' OR &IPEDSSCODE = '3' OR
+      &IPEDSSCODE = '8' OR &IPEDSSCODE = '9'
+
+      LET $POS_CODE = '01'
+   END-IF
+ 
+   IF &IPEDSSCODE = '4' OR &IPEDSSCODE = '5' OR &IPEDSSCODE = '6' OR
+      &IPEDSSCODE = '7' 
+      
+      LET $POS_CODE = '03'
+   END-IF
+
+   	 ! SHOW 'THIS IS THE JOBCODE PART.....'
+	 ! SHOW '&JOBCODE= ' &JOBCODE
+	 
+    IF &JOBCODE='1009  ' OR &JOBCODE='1012  ' OR &JOBCODE='1018  ' OR
+	   &JOBCODE='1019  ' OR &JOBCODE='1025  ' OR &JOBCODE='1032  ' OR
+	   &JOBCODE='1035  ' OR &JOBCODE='1037  ' OR &JOBCODE='1040  ' OR
+	   &JOBCODE='1043  ' OR &JOBCODE='1048  ' OR &JOBCODE='1049  ' OR
+	   &JOBCODE='1052  ' OR &JOBCODE='1057  ' OR &JOBCODE='1058  ' OR
+	   &JOBCODE='1064  ' OR &JOBCODE='1067  ' OR &JOBCODE='1076  ' OR
+	   &JOBCODE='1072  '
+	   
+       LET $POS_CODE = '05'  
+	   !SHOW '&H.JOBCODE =' &JOBCODE
+	!	SHOW 'POS= 02' $POS_CODE
+    END-IF
+	
+	
+	
+	LET $TRS_FLAG = 'Y'
+    LET $NON_STAN_FLAG = 'N'
+	LET $ANNL_RT = &F1.ANNUAL_RT
+   	!LET $EFFDT = TRANSLATE(&EFFDT,'/','-')
+	LET $TERM_REA_CODE = 'O'
+	SHOW 'F1.ANNUAL_RT= ' &F1.ANNUAL_RT
+	SHOW '$ANNL_RT= ' $ANNL_RT
+	SHOW '#ANNUAL_SAL=' #ANNUAL_SAL
+	SHOW 'TERM_REA_CODE =' $TERM_REA_CODE
+	
+	MOVE #ANNUAL_SAL TO $ANNUAL_SAL '0000000V00'
+	IF &F1.EMPL_STATUS = 'D'
+	   LET $TERM_REA_CODE = 'D'
+	   LET #ANNUAL_SAL = to_number($ANNL_RT)
+	   MOVE #ANNUAL_SAL TO $ANNUAL_SAL '0000000V00'
+	   SHOW '&F1.EMPL_STATUS=' &F1.EMPL_STATUS
+	   SHOW '$ANNUAL_SAL=' $ANNUAL_SAL
+	END-IF   
+	
+	IF &F1.EMPL_STATUS = 'R'
+	   LET $TERM_REA_CODE = 'R'
+	   MOVE 00000000 TO #ANNUAL_SAL 
+	   MOVE #ANNUAL_SAL TO $ANNUAL_SAL '0000000V00'
+	   SHOW '&F1.EMPL_STATUS=' &F1.EMPL_STATUS
+	   SHOW '$ANNUAL_SAL=' $ANNUAL_SAL
+	END-IF 
+	
+	IF &F1.EMPL_STATUS = 'T'
+	   LET $TERM_REA_CODE = 'W'
+	   MOVE 00000000 TO #ANNUAL_SAL 
+	   MOVE #ANNUAL_SAL TO $ANNUAL_SAL '0000000V00'
+	   SHOW '&F1.EMPL_STATUS=' &F1.EMPL_STATUS
+	   SHOW '$ANNUAL_SAL=' $ANNUAL_SAL
+	END-IF 
+		
+	IF &F1.PAYGROUP = 'SLE' OR &F1.PAYGROUP = 'NCS'
+	   LET $SALARY_FLAG = 'S'
+	   LET $HOURLY_RT = '00000'
+	END-IF   
+	
+	IF &F1.PAYGROUP = 'SLN' OR &F1.PAYGROUP = 'NCH' OR &F1.PAYGROUP = 'HRY'
+	   LET $SALARY_FLAG = 'H'
+	   LET #HOURLY_RT = &F1.HOURLY_RT
+	   MOVE #HOURLY_RT TO $HOURLY_RT '000V00'
+	END-IF 
+ 
+  FROM PS_PERSONNEL F1
+  !WHERE F1.COMPANY = $COMPANY
+  !   AND F1.PAYGROUP = $PAYGROUP
+  !   AND F1.EFFDT =
+  !      (SELECT MAX(F1_ED.EFFDT) FROM PS_PERSONNEL F1_ED
+  !      WHERE F1.EMPLID = F1_ED.EMPLID
+  !        AND F1.EMPL_RCD = F1_ED.EMPL_RCD
+  !        AND F1_ED.EFFDT <= SUBSTRING(CONVERT(CHAR,GETDATE(),121), 1, 10))
+  !  AND F1.EFFSEQ =
+  !      (SELECT MAX(F1_ES.EFFSEQ) FROM PS_PERSONNEL F1_ES
+  !      WHERE F1.EMPLID = F1_ES.EMPLID
+  !        AND F1.EMPL_RCD = F1_ES.EMPL_RCD
+  !        AND F1.EFFDT = F1_ES.EFFDT)
+     WHERE F1.EMPLID = $EMPLID
+     !AND A.EMPLID = '5059'
+     !AND A.PAY_END_DT BETWEEN '2003-12-01' AND '2003-12-31'
+     !AND A.EMPL_RCD = B.EMPL_RCD
+
+END-SELECT    
+end-procedure ! GET_PERSONNEL
+
+!************************************************************************
+! Procedure GET_PERSONAL_DATA
+!************************************************************************
+begin-procedure GET_PERSONAL_DATA
+SHOW 'GET_PERSONNAL_DATA= ' $EMPLID
+BEGIN-SELECT 
+RTRIM(CONVERT(CHAR,F.BIRTHDATE,101)) &BIRTHDATE
+F.SEX
+F.ADDRESS1
+F.ADDRESS2
+F.CITY
+F.STATE
+F.POSTAL
+F.PHONE
+
+
+
+	   LET $BIRTHDATE  = TRANSLATE(&BIRTHDATE,'/','')
+	   SHOW '$BIRTHDATE=' $BIRTHDATE
+	   LET $PHONE_NUM = &F.PHONE
+	   LET $PHONE_1 = substr($PHONE_NUM,1,3)
+	   LET $PHONE_2 = substr($PHONE_NUM,5,3)
+	   LET $PHONE_3 = substr($PHONE_NUM,9,4)
+	   LET $PHONE = $PHONE_1||$PHONE_2||$PHONE_3
+	   LET $SEX = &F.SEX
+	   LET $ADDRESS1 = &F.ADDRESS1
+	   LET $ADDRESS2 = &F.ADDRESS2
+	   LET $CITY = &F.CITY
+	   LET $STATE = &F.STATE
+	   LET $ZIP = substr(&F.POSTAL,1,5)
+	   !let $_Zip = substr($Zip,1,5)
+	   SHOW 'ZIPCODE= ' $ZIP
+	   SHOW 
+	   
+	   
+	   
+
+  FROM PS_PERSONAL_DATA F
+      ! PS_CITIZENSHIP G
+  WHERE F.EMPLID = $EMPLID  !&A.EMPLID
+   ! AND F.EMPLID = G.EMPLID
+
+END-SELECT
+end-procedure ! GET_PERSONAL_DATA
+
+!************************************************************************
+! Procedure GET_CITIZENSHIP
+!************************************************************************
+begin-procedure GET_CITIZENSHIP
+SHOW 'GET_CITIZENSHIP= ' $EMPLID
+BEGIN-SELECT 
+G.CITIZENSHIP_STATUS
+  	 
+	 SHOW 'CITIZENSHIP= ' &G.CITIZENSHIP_STATUS
+       IF &G.CITIZENSHIP_STATUS = '1' OR &G.CITIZENSHIP_STATUS = '2' 
+	      LET $CITIZENSHIP = 'Y'
+	   ELSE
+	      LET $CITIZENSHIP = ' '
+	   END-IF
+	   IF &G.CITIZENSHIP_STATUS = 'N' OR &G.CITIZENSHIP_STATUS = '3' OR &G.CITIZENSHIP_STATUS = '4'  	  
+	      LET $CITIZENSHIP = 'N'
+	   END-IF	  
+	   
+ FROM PS_CITIZENSHIP G
+  WHERE G.EMPLID = $EMPLID  !&A.EMPLID
+    
+END-SELECT
+end-procedure ! GET_CITIZENSHIP
+
+!************************************************************************
+! Procedure GET_TRS_PAY_BACK_DEDUCTION
+!************************************************************************
+begin-procedure GET_TRS_PAY_BACK_DEDUCTION
+BEGIN-SELECT 
+
+E.DED_CUR &TOT_PAY_BACK_DED
+
+	   LET $TRS_PAY_BACK_FLAG = 'N'
+	   LET #TRS_PAY_BACK_DED = #TRS_PAY_BACK_DED + &TOT_PAY_BACK_DED
+	   
+	   SHOW 'TOT_DED=' &TOT_PAY_BACK_DED
+	   
+FROM PS_PAY_DEDUCTION E
+   WHERE E.COMPANY=&A.COMPANY
+	  AND E.PAYGROUP=&A.PAYGROUP
+      AND E.PAY_END_DT=&A.PAY_END_DT
+		AND E.OFF_CYCLE=&A.OFF_CYCLE
+		AND E.PAGE_NUM=&A.PAGE_NUM
+		AND E.LINE_NUM=&A.LINE_NUM
+		AND E.SEPCHK=&A.SEPCHK
+		AND E.DEDCD ='TRSPAY'
+		AND E.DED_CLASS<>'P'	
+
+END-SELECT
+end-procedure ! GET_TRS_PAY_BACK_DEDUCTION
+
+begin-procedure PROCESS_IPEDSSCODE
+BEGIN-SELECT 
+H.EMPLID 
+!H.IPEDSSCODE &IPEDSSCODE
+!H.JOBCODE &JOBCODE
+H.FTE
+ 
+   LET #FTE = &H.FTE
+   MOVE #FTE TO $FTE '0V00'
+  ! LET $FTE = &H.FTE
+   LET $POS_CODE = '0X'
+   !SHOW 'EMPLID = ' &H.EMPLID
+   !SHOW 'IPEDSSCODE = ' &IPEDSSCODE
+   !SHOW 'JOBCODE = ' &JOBCODE
+   IF &IPEDSSCODE = '1' OR &IPEDSSCODE = '2' OR &IPEDSSCODE = '3' OR
+      &IPEDSSCODE = '8' OR &IPEDSSCODE = '9'
+
+      LET $POS_CODE = '01'
+   END-IF
+ 
+   IF &IPEDSSCODE = '4' OR &IPEDSSCODE = '5' OR &IPEDSSCODE = '6' OR
+      &IPEDSSCODE = '7' 
+      
+      LET $POS_CODE = '03'
+   END-IF
+
+   	 ! SHOW 'THIS IS THE JOBCODE PART.....'
+	 ! SHOW '&JOBCODE= ' &JOBCODE
+	 
+    IF &JOBCODE='1009  ' OR &JOBCODE='1012  ' OR &JOBCODE='1018  ' OR
+	   &JOBCODE='1019  ' OR &JOBCODE='1025  ' OR &JOBCODE='1032  ' OR
+	   &JOBCODE='1035  ' OR &JOBCODE='1037  ' OR &JOBCODE='1040  ' OR
+	   &JOBCODE='1043  ' OR &JOBCODE='1048  ' OR &JOBCODE='1049  ' OR
+	   &JOBCODE='1052  ' OR &JOBCODE='1057  ' OR &JOBCODE='1058  ' OR
+	   &JOBCODE='1064  ' OR &JOBCODE='1067  ' OR &JOBCODE='1076  ' OR
+	   &JOBCODE='1072  '
+	   
+       LET $POS_CODE = '05'  
+	   !SHOW '&H.JOBCODE =' &JOBCODE
+	!	SHOW 'POS= 02' $POS_CODE
+    END-IF
+	
+	
+	
+	LET $TRS_FLAG = 'Y'
+    LET $NON_STAN_FLAG = 'N'
+	!LET $BEG_CONTRACT_DT = '00000000'
+	!LET $END_CONTRACT_DT = '00000000'
+	
+
+FROM PS_EMPLOYEES H
+WHERE H.EFFDT =
+        (SELECT MAX(H_ED.EFFDT) FROM PS_EMPLOYEES H_ED
+        WHERE H.EMPLID    = H_ED.EMPLID
+          AND H.EMPL_RCD = H_ED.EMPL_RCD
+		  AND H_ED.EFFDT <= GETDATE())    
+  AND H.EFFSEQ =
+        (SELECT MAX(H_ES.EFFSEQ) FROM PS_EMPLOYEES H_ES
+        WHERE H.EMPLID    = H_ES.EMPLID
+          AND H.EMPL_RCD = H_ES.EMPL_RCD
+          AND H.EFFDT     = H_ES.EFFDT)
+  AND H.EMPLID=$EMPLID  !&A.EMPLID
+END-SELECT
+end-procedure  !PROCESS_IPEDSSCODE
+
+begin-procedure GET_DATES
+SHOW 'GET_DATES'
+BEGIN-SELECT  
+RTRIM(CONVERT(CHAR,I.TERMINATION_DT,101))  &TERMINATION_DT
+RTRIM(CONVERT(CHAR,I.HIRE_DT,112))  &HIRE_DT
+RTRIM(CONVERT(CHAR,I.REHIRE_DT,112))  &REHIRE_DT
+DATEDIFF(DAY,I.HIRE_DT,GETDATE()) &HIRE_PAYDAYS
+DATEDIFF(DAY,I.REHIRE_DT,GETDATE()) &REHIRE_PAYDAYS
+
+		
+		LET $BEG_DATE_WORK = $FIS_BEGIN_DATE
+		LET $END_DATE_WORK = $FIS_END_DATE
+		SHOW '$FIS_BEGIN_DATE=' $FIS_BEGIN_DATE
+		SHOW '$FIS_END_DATE=' $FIS_END_DATE
+		SHOW 'HIRE_PAYDAYS=' &HIRE_PAYDAYS
+		SHOW 'REHIRE_PAYDAYS=' &REHIRE_PAYDAYS
+		
+		LET $TERM_DATE = TRANSLATE(&TERMINATION_DT,'/','')
+		LET $TERM_DATE_MMDDYYYY = TRANSLATE(&TERMINATION_DT,'/','-')
+		LET $TERM_MM = SUBSTR($TERM_DATE,1,2)
+		LET $TERM_DD = SUBSTR($TERM_DATE,3,2)
+		LET $TERM_YYYY = SUBSTR($TERM_DATE,5,4)
+		LET $TERM_DATE1 = $TERM_YYYY||$TERM_MM||$TERM_DD
+	IF &REHIRE_DT <> ''
+		LET $REHIRE_DT = &REHIRE_DT
+		!LET $REHIRE_DT = TRANSLATE(&REHIRE_DT,'/','-')
+	    LET $HIRE_YYYY =  substr($REHIRE_DT,1,4)
+	    LET $HIRE_MM = substr($REHIRE_DT,5,2)
+	    LET $HIRE_DD = substr($REHIRE_DT,7,2)
+		LET $HIRE_DT = &REHIRE_DT   !TRANSLATE(&REHIRE_DT,'/','-')
+	    LET $HIRE_DATE = $HIRE_MM || $HIRE_DD || $HIRE_YYYY
+		LET #HIRE_PAYDAYS = &REHIRE_PAYDAYS
+	ELSE
+	    LET $HIRE_DT = &HIRE_DT
+		!LET $HIRE_DT = TRANSLATE(&HIRE_DT,'/','-')
+	    LET $HIRE_YYYY =  substr($HIRE_DT,1,4)
+	    LET $HIRE_MM = substr($HIRE_DT,5,2)
+	    LET $HIRE_DD = substr($HIRE_DT,7,2)
+	    LET $HIRE_DATE = $HIRE_MM || $HIRE_DD || $HIRE_YYYY
+		LET #HIRE_PAYDAYS = &HIRE_PAYDAYS
+	END-IF      
+		IF $HIRE_DT >= $FIS_BEGIN_DATE1 AND $HIRE_DT <= $FIS_END_DATE1
+		    LET $BEG_DATE_WORK = $HIRE_DATE
+			LET $BEG_DATE_WORK_MM = SUBSTR($BEG_DATE_WORK,1,2)
+			LET $BEG_DATE_WORK_DD = SUBSTR($BEG_DATE_WORK,3,2)
+			LET $BEG_DATE_WORK_YYYY = SUBSTR($BEG_DATE_WORK,5,4)
+			SHOW '$BEG_DATE_WORK=' $BEG_DATE_WORK
+			LET $BEG_DATE_WORK2 = $BEG_DATE_WORK_YYYY||'-'||$BEG_DATE_WORK_MM||'-'||$BEG_DATE_WORK_DD
+			SHOW 'HIRE DATE GREATER THAN BEGIN FISCAL YEAR DATE=' $FIS_BEGIN_DATE1
+			!let $BEG_DATE_WORK1 = strtodate($BEG_DATE_WORK2,{DTUDateFormat})
+            !let $CUR_END_DATE3  = strtodate($CUR_END_DATE2,{DTUDateFormat})
+            !LET #DATE_DIFF = TRUNC(datediff($BEG_DATE_WORK2, $CUR_END_DATE2,'Day'),0)
+			!LET #PAY_DAYS = #HIRE_PAYDAYS
+			!LET #PAY_DAYS = EDIT(TO_NUMBER($WORK_DAYS),'099')	   	 			!C003
+	        !SHOW '#PAY_DAYS=' #PAY_DAYS
+			!MOVE #PAY_DAYS TO $NUM_PAY_DAYS '000'
+			!SHOW '#PAY_DAYS= ' #PAY_DAYS   !#PAY_DAYS
+			SHOW '$BEG_DATE_WORK=' $BEG_DATE_WORK
+			SHOW '$BEG_DATE_WORK1=' $BEG_DATE_WORK1
+			SHOW '$BEG_DATE_WORK2=' $BEG_DATE_WORK2
+			SHOW '$HIRE_DATE=' $HIRE_DATE
+			SHOW '$CUR_END_DATE2=' $CUR_END_DATE2
+			SHOW '$CUR_END_DATE3=' $CUR_END_DATE3
+		END-IF
+    IF $TERM_DATE <> ''			   			 									!C003
+	   LET $END_DATE_WORK = $TERM_DATE											!C003
+	   LET #PAY_DAYS = EDIT(TO_NUMBER($WORK_DAYS),'099')						!C003
+	   SHOW '#PAY_DAYS=' #PAY_DAYS												!C003
+	   MOVE #PAY_DAYS TO $NUM_PAY_DAYS '000'									!C003
+	END-IF 			  	 			   											!C003
+	   SHOW 'HIRE_DATE =' $HIRE_DT  
+	   SHOW 'TERM_DATE= ' $TERM_DATE	
+	   SHOW 'TERM_DATE_MMDDYYYY= ' $TERM_DATE_MMDDYYYY	
+	   SHOW '$END_DATE_WORK=' $END_DATE_WORK
+	   SHOW 'GET_DATES FIS_BEGIN_DATE=' $FIS_BEGIN_DATE
+	   SHOW 'GET_DATES FIS_END_DATE=' $FIS_END_DATE
+	  
+FROM PS_EMPLOYMENT I
+  WHERE I.EMPLID=$EMPLID  !&A.EMPLID
+!  AND I.TERMINATION_DT >= $BEGIN_DATE
+!  AND I.TERMINATION_DT <= $END_DATE
+END-SELECT
+end-procedure  !GET_DATES
+
+begin-procedure  READ_JOB
+SHOW 'READ_JOB'
+SHOW '$EMPLID=' $EMPLID
+BEGIN-SELECT DISTINCT
+J.EMPLID
+J.EMPL_STATUS
+J.ACTION
+J.ACTION_REASON
+J.PAYGROUP
+J.HOURLY_RT
+!RTRIM(CONVERT(CHAR,J.EFFDT,110))
+J.ANNUAL_RT
+J.FTE
+J.FICA_STATUS_EE
+ 
+   LET #FTE = &J.FTE
+   MOVE #FTE TO $FTE '0V00'
+   SHOW 'FICA_STATUS_EE=' &J.FICA_STATUS_EE
+    IF &J.FICA_STATUS_EE = 'N'
+      LET $PAY_FICA= 'F'
+	END-IF 
+	IF &J.FICA_STATUS_EE = 'E'
+      LET $PAY_FICA= 'N'
+	END-IF
+	IF &J.FICA_STATUS_EE = 'M'
+      LET $PAY_FICA= 'M'
+	END-IF
+	  
+    LET $ANNL_RT = &J.ANNUAL_RT
+   	!LET $EFFDT = TRANSLATE(&EFFDT,'/','-')
+	LET $TERM_REA_CODE = 'O'
+	SHOW 'J.ANNUAL_RT= ' &J.ANNUAL_RT
+	SHOW '$ANNL_RT= ' $ANNL_RT
+	SHOW '#ANNUAL_SAL=' #ANNUAL_SAL
+	SHOW 'TERM_REA_CODE =' $TERM_REA_CODE
+	IF &J.EMPL_STATUS = 'D'
+	   LET $TERM_REA_CODE = 'D'
+	   LET #ANNUAL_SAL = to_number($ANNL_RT)
+	   MOVE #ANNUAL_SAL TO $ANNUAL_SAL '0000000V00'
+	END-IF   
+	
+	IF &J.EMPL_STATUS = 'R'
+	   LET $TERM_REA_CODE = 'R'
+	END-IF 
+	
+	IF &J.EMPL_STATUS = 'T'
+	   LET $TERM_REA_CODE = 'W'
+	END-IF 
+		
+	IF &J.PAYGROUP = 'SLE' OR &J.PAYGROUP = 'NCS'
+	   LET $SALARY_FLAG = 'S'
+	   LET $HOURLY_RT = '00000'
+	END-IF   
+	
+	IF &J.PAYGROUP = 'SLN' OR &J.PAYGROUP = 'NCH' OR &J.PAYGROUP = 'HRY'
+	   LET $SALARY_FLAG = 'H'
+	   LET #HOURLY_RT = &J.HOURLY_RT
+	   MOVE #HOURLY_RT TO $HOURLY_RT '000V00'
+	END-IF 
+				 
+  FROM PS_JOB J
+   WHERE J.EFFDT =
+        (SELECT MAX(J_ED.EFFDT) FROM PS_JOB J_ED
+        WHERE J.EMPLID = J_ED.EMPLID
+          AND J.EMPL_RCD = J_ED.EMPL_RCD
+          AND J_ED.EFFDT <= SUBSTRING(CONVERT(CHAR,GETDATE(),121), 1, 10))!GETDATE()) 
+    ! AND J.EFFDT >= $BEGIN_DATE   
+	! AND J.EFFDT <= $END_DATE 
+    AND J.EFFSEQ =
+        (SELECT MAX(J_ES.EFFSEQ) FROM PS_JOB J_ES
+        WHERE J.EMPLID = J_ES.EMPLID
+          AND J.EMPL_RCD = J_ES.EMPL_RCD
+          AND J.EFFDT = J_ES.EFFDT)
+	 AND J.EMPLID = $EMPLID
+	 !AND J.EMPL_RCD = $EMPL_RCD
+	 AND J.EMPL_STATUS IN ('D','R','T')
+	 !AND J.ANNUAL_RT > 1
+     !AND J.EFFDT BETWEEN '2003-12-01' AND '2003-12-31'
+	 
+
+END-SELECT 
+end-procedure  !READ_JOB
+
+begin-procedure  GET_SAVINGS_PLAN
+SHOW 'SAVINGS_PLAN,$EMPLID=' $EMPLID
+
+BEGIN-SELECT DISTINCT
+
+K.EMPLID 
+(CONVERT(CHAR(10),K.COVERAGE_BEGIN_DT,112)) &COV_BEGIN_DT
+(CONVERT(CHAR(10),K.COVERAGE_END_DT,112))  &COV_END_DT
+ 
+ 
+  SHOW '&COV_BEGIN_DT=' &COV_BEGIN_DT
+  ! IF &COV_BEGIN_DT > $FIS_BEGIN_DATE1 AND &COV_BEGIN_DT < $FIS_END_DATE1
+        LET $COV_BEGIN_DT = TRANSLATE(&COV_BEGIN_DT,'/','-')
+        LET $TRS_YYYY =  substr($COV_BEGIN_DT,1,4)
+	    LET $TRS_MM = substr($COV_BEGIN_DT,5,2)
+	    LET $TRS_DD = substr($COV_BEGIN_DT,7,2)
+	    LET $TRS_DATE = $TRS_MM || $TRS_DD || $TRS_YYYY
+		LET $TRS_DATE1 = $TRS_YYYY || $TRS_MM || $TRS_DD
+  ! END-IF	 
+    ! LET $BEG_DATE_WORK = TRANSLATE(&COV_BEGIN_DT,'/','')
+	! LET $END_DATE_WORK = TRANSLATE(&COV_END_DT,'/','')
+	! LET $BEG_MON_WORK =  SUBSTR($BEG_DATE_WORK,1,2)
+    ! LET $BEG_DD_WORK =  SUBSTR($BEG_DATE_WORK,3,2)
+    ! LET $BEG_YYYY_WORK =  SUBSTR($BEG_DATE_WORK,5,4)
+	! LET $BEG_DATE_WORK1 = $BEG_YYYY_WORK||$BEG_MON_WORK||$BEG_DD_WORK
+	! SHOW '$BEG_DATE_WORK= ' $BEG_DATE_WORK
+	! SHOW '$END_DATE_WORK= ' $END_DATE_WORK
+	 
+  FROM PS_SAVINGS_PLAN K
+  WHERE K.EFFDT =
+        (SELECT MAX(K_ED.EFFDT) FROM PS_SAVINGS_PLAN K_ED
+        WHERE K.EMPLID = K_ED.EMPLID
+          AND K.EMPL_RCD = K_ED.EMPL_RCD
+          AND K.PLAN_TYPE = K_ED.PLAN_TYPE
+          AND K.BENEFIT_NBR = K_ED.BENEFIT_NBR
+          AND K_ED.EFFDT <= SUBSTRING(CONVERT(CHAR,GETDATE(),121), 1, 10))
+  AND K.PLAN_TYPE = '4X'
+  AND K.COVERAGE_ELECT = 'E'
+  AND K.EMPLID = $EMPLID
+  
+END-SELECT 
+end-procedure  !GET_SAVINGS_PLAN
+
+!************************************************************************
+! Procedure GET_ADDRESS	 										   	  			!C002
+!************************************************************************
+begin-procedure GET_ADDRESS														!C002
+SHOW 'GET_ADDRESS= ' $EMPLID													!C002
+
+BEGIN-SELECT 	   	 															!C002
+L.EFFDT																			!C002
+L.ADDRESS1																		!C002
+L.ADDRESS2																		!C002
+L.CITY																			!C002
+L.STATE																			!C002
+L.POSTAL																		!C002
+
+	   SHOW 'ADDRESS....&EFFDT=' &L.EFFDT										!C002
+       LET $ADDR_EFFDT = TRANSLATE(&L.EFFDT,'/','-')							!C002
+	   LET $ADDR_YYYY =  substr($ADDR_EFFDT,1,4)								!C002
+	   LET $ADDR_MM = substr($ADDR_EFFDT,6,2)									!C002
+	   LET $ADDR_DD = substr($ADDR_EFFDT,9,2)									!C002
+	  ! LET $ADDR_DATE = $TRS_MM || $TRS_DD || $TRS_YYYY						!C002
+	   LET $ADDR_DATE = $ADDR_YYYY || $ADDR_MM || $ADDR_DD						!C002
+	   SHOW '$ADDR_DATE= ' $ADDR_DATE 		   	  								!C002
+	   LET $ADDRESS1 = &L.ADDRESS1												!C002
+	   LET $ADDRESS2 = &L.ADDRESS2												!C002
+	   LET $CITY = &L.CITY														!C002
+	   LET $STATE = &L.STATE													!C002
+	   LET $ZIP = substr(&L.POSTAL,1,5)											!C002
+	   
+  FROM PS_ADDRESSES L															!C002
+  WHERE L.EMPLID = $EMPLID														!C002
+  AND L.ADDRESS_TYPE = 'MAIL'													!C002
+  AND L.EFFDT =		   															!C002
+        (SELECT MAX(L_ED.EFFDT) FROM PS_ADDRESSES L_ED							!C002
+        WHERE L.EMPLID = L_ED.EMPLID 			  								!C002
+          AND L.ADDRESS_TYPE = L_ED.ADDRESS_TYPE								!C002
+          AND L_ED.EFFDT <= SUBSTRING(CONVERT(CHAR,GETDATE(),121), 1, 10))		!C002
+		  
+END-SELECT	  			 										   	  			!C002
+end-procedure ! GET_ADDRESS														!C002
+
+begin-procedure REPORT_WRITE_MD20_RECORD
+	LET $RECORD_TYPE = '20'
+	SHOW '#LINE=' #LINE
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9)
+PRINT $IDENT_CODE (,18)
+PRINT $BIRTHDATE (,19)
+PRINT $SEX (,27)
+PRINT $LAST_NAME (,28)
+PRINT $FIRST_NAME (,53)
+PRINT $GENERATION (,78)
+PRINT $MIDDLE_NAME (,82)
+PRINT $CITIZENSHIP (,107)
+PRINT ' ' (,199)
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '20':2 
+!				 $WS_SSN:9 
+!				 'S':1
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:25 
+!				 $GENERATION:4
+!                 $MIDDLE_NAME:25 
+!				 $CITIZENSHIP:1
+!				 $FIL:93  
+				 
+!LET #MD20_LINE = #MD20_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_20_CNT = #RECORD_20_CNT + 1
+end-procedure ! REPORT_WRITE_MD20_RECORD
+
+begin-procedure REPORT_WRITE_MD25_RECORD
+   LET $RECORD_TYPE = '25'
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9)
+PRINT $IDENT_CODE (,18)
+PRINT $BIRTHDATE (,19)
+PRINT $SEX (,27)
+PRINT $LAST_NAME (,28)
+PRINT $FIRST_NAME (,53)
+PRINT $GENERATION (,78)
+PRINT $MIDDLE_NAME (,82)
+PRINT $NEW_LAST_NAME (,83)
+PRINT $NEW_FIRST_NAME (,108)
+PRINT $NEW_GENERATION (,133)
+PRINT $NEW_MIDDLE_NAME (,137)
+PRINT $NEW_CITIZENSHIP (,162)
+PRINT $NEW_WS_SSN (,163)
+PRINT $NEW_IDENT_CODE (,172)
+PRINT $NEW_BIRTHDATE (,173)
+PRINT $NEW_SEX (,181)
+PRINT $ADJUST_REASON_CODE (,182)
+PRINT ' ' (,199)
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '25':2 
+!				 $WS_SSN:9 
+!				 'S':1
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:25 
+!				 $GENERATION:4
+!                 $MIDDLE_NAME:1
+!				 $NEW_LAST_NAME:25
+!				 $NEW_FIRST_NAME:25
+!				 $NEW_GENERATION:4
+!				 $NEW_MIDDLE_NAME:25
+!				 $NEW_CITIZENSHIP:1
+!				 $NEW_WS_SSN:9
+!				 $NEW_IDENT_CODE:1
+!				 $NEW_BIRTHDATE:8
+!				 $NEW_SEX:1
+!				 $ADJUST_REASON_CODE:1
+!				 $FIL:18  
+				 
+!LET #MD25_LINE = #MD25_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_25_CNT = #RECORD_25_CNT + 1
+end-procedure ! REPORT_WRITE_MD25_RECORD
+
+begin-procedure REPORT_WRITE_MD30_RECORD
+SHOW 'REPORT_WRITE_MD30_RECORD'
+SHOW '$TRS_DISTRICT=' $TRS_DISTRICT
+SHOW '$REPORT_TYPE=' $REPORT_TYPE
+SHOW '$RECORD_TYPE=' $RECORD_TYPE
+SHOW '$WS_SSN=' $WS_SSN
+LET $RECORD_TYPE = '30'
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9) 
+PRINT $BIRTHDATE (,18)
+PRINT $SEX (,26) 
+PRINT $LAST_NAME (,27)  
+PRINT $FIRST_NAME (,52,1) 
+PRINT $GENERATION (,53,4)
+PRINT $MIDDLE_NAME (,57,1)
+PRINT $ADDRESS1 (,58)
+PRINT $ADDRESS2 (,98)
+PRINT $CITY (,138)
+PRINT $STATE (,163)
+PRINT $ZIP (,165)
+PRINT $PHONE (,176)
+PRINT ' ' (,199)
+ 
+      
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '30':2 
+!				 $WS_SSN:9 
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:1 
+!				 $GENERATION:4
+!				 $MIDDLE_NAME:1
+!				 $ADDRESS1:40
+!				 $ADDRESS2:40
+!				 $CITY:25
+!				 $STATE:2
+!				 $ZIP:11
+!				 $PHONE:10
+!                 $FIL:15  
+				 
+!LET #MD30_LINE = #MD30_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_30_CNT = #RECORD_30_CNT + 1
+end-procedure ! REPORT_WRITE_MD30_RECORD
+
+begin-procedure REPORT_WRITE_MD31_RECORD
+SHOW 'REPORT_WRITE_MD31_RECORD'
+   LET $RECORD_TYPE = '31'
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9) 
+PRINT $BIRTHDATE (,18)
+PRINT $SEX (,26) 
+PRINT $LAST_NAME (,27)  
+PRINT $FIRST_NAME (,52,1) 
+PRINT $GENERATION (,53)
+PRINT $MIDDLE_NAME (,57,1)
+PRINT $ADDRESS3 (,58)
+PRINT $COUNTRY (,98)
+PRINT $SECONDARY_NAME (,138)
+PRINT ' ' (,199) 
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '31':2 
+!				 $WS_SSN:9 
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:1 
+!				 $GENERATION:4
+!				 $MIDDLE_NAME:1
+!				 $ADDRESS3:40
+!				 $COUNTRY:40
+!				 $SECONDARY_NAME:40
+!                 $FIL:23  
+				 
+!LET #MD31_LINE = #MD31_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_31_CNT = #RECORD_31_CNT + 1
+end-procedure ! REPORT_WRITE_MD31_RECORD
+
+begin-procedure REPORT_WRITE_MD40_RECORD
+  LET $RECORD_TYPE = '40'
+LET $NON_STAN_CONT_FLAG = ' '
+!LET $BEG_DATE_WORK = '00000000'
+!LET $END_DATE_WORK = '00000000'
+LET $AMT_JULY = '000000000'
+LET $AMT_AUG = '000000000'
+LET $NUM_PAY_DAYS = '000'
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9) 
+PRINT $BIRTHDATE (,18)
+PRINT $SEX (,26) 
+PRINT $LAST_NAME (,27)  
+PRINT $FIRST_NAME (,52) 
+PRINT $GENERATION (,77)
+PRINT $MIDDLE_NAME (,81)
+PRINT $SALARY_FLAG (,106)
+PRINT $HOURLY_RT (,107)
+PRINT $TRS_FLAG (,112)
+PRINT $NON_STAN_CONT_FLAG (,113)
+PRINT $BEG_DATE_WORK (,114)
+PRINT $END_DATE_WORK (,122)
+PRINT $AMT_JULY (,130)
+PRINT $AMT_AUG (,139)
+PRINT $NUM_PAY_DAYS (,148)
+PRINT $FTE (,151)
+PRINT $POS_CODE (,154)
+PRINT $PAY_FICA (,156)
+PRINT $ORP_ELIG_DATE (,157)
+PRINT $ORP_ELEC_DATE (,165)
+PRINT $ORP_VEST_FLAG (,173)
+PRINT ' ' (,174)
+PRINT $TRS_DATE (,177)
+PRINT ' ' (,199)
+   
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '40':2 
+!				 $WS_SSN:9 
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:25 
+!				 $GENERATION:4
+!				 $MIDDLE_NAME:25
+!				 $SALARY_FLAG:1
+!				 $HOURLY_RT:5
+!				 $TRS_FLAG:1
+!				 $NON_STAN_CONT_FLAG:1
+!				 $BEG_DATE_WORK:8
+!				 $END_DATE_WORK:8
+!				 $AMT_JULY:9
+!				 $AMT_AUG:9
+!				 $NUM_PAY_DAYS:3
+!				 $FTE:3
+!				 $POS_CODE:2
+!				 $PAY_FICA:1
+!				 $ORP_ELIG_DATE:8
+!				 $ORP_ELEC_DATE:8
+!				 $ORP_VEST_FLAG:1
+!				 $FIL:3
+!				 $TRS_DATE:8
+!                 $FIL:16  
+				 
+!LET #MD40_LINE = #MD40_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_40_CNT = #RECORD_40_CNT + 1
+MOVE 00000 TO $HOURLY_RT 
+end-procedure ! REPORT_WRITE_MD40_RECORD
+	
+begin-procedure REPORT_WRITE_MD45_RECORD
+LET $RECORD_TYPE = '45'
+LET $NON_STAN_CONT_FLAG = ' '
+LET $BEG_DATE_CONT = '00000000'
+LET $END_DATA_CONT = '00000000'
+LET $AMT_JULY = '000000000'
+LET $AMT_AUG = '000000000'
+LET $NUM_PAY_DAYS = '000'
+LET $ORI_POS_CODE = '00'
+
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9) 
+PRINT $BIRTHDATE (,18)
+PRINT $SEX (,26) 
+PRINT $LAST_NAME (,27)  
+PRINT $FIRST_NAME (,52) 
+PRINT $GENERATION (,77)
+PRINT $MIDDLE_NAME (,81)
+PRINT $SALARY_FLAG (,106)
+PRINT $HOURLY_RT (,107)
+PRINT $TRS_FLAG (,112)
+PRINT $NON_STAN_CONT_FLAG (,113)
+PRINT $BEG_DATE_WORK (,114)
+PRINT $END_DATE_WORK (,122)
+PRINT $AMT_JULY (,130)
+PRINT $AMT_AUG (,139)
+PRINT $NUM_PAY_DAYS (,148)
+PRINT $FTE (,151)
+PRINT $POS_CODE (,154)
+PRINT $PAY_FICA (,156)
+PRINT $ORP_ELIG_DATE (,157)
+PRINT $ORP_ELEC_DATE (,165)
+PRINT $ORP_VEST_FLAG (,173)
+PRINT $ADJ_REA_CODE (,174)
+PRINT $ORI_POS_CODE (,175)
+PRINT $TRS_DATE (,177)
+PRINT ' ' (,199)
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '45':2 
+!				 $WS_SSN:9 
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:25 
+!				 $GENERATION:4
+!				 $MIDDLE_NAME:25
+!				 $SALARY_FLAG:1
+!				 $HOURLY_RT:5
+!				 $TRS_FLAG:1
+!				 $NON_STAN_CONT_FLAG:1
+!				 $BEG_DATE_CONT:8
+!				 $END_DATE_CONT:8
+!				 $AMT_JULY:9
+!				 $AMT_AUG:9
+!				 $NUM_PAY_DAYS:3
+!				 $FTE:3
+!				 $POS_CODE:2
+!				 $PAY_FICA:1
+!				 $ORP_ELIG_DATE:8
+!				 $ORP_ELEC_DATE:8
+!				 $ORP_VEST_FLAG:1
+!				 $ADJ_REA_CODE:1
+!				 $ORI_POS_CODE:2
+!				 $TRS_DATE:8
+!                 $FIL:16  
+				 
+!LET #MD45_LINE = #MD45_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_45_CNT = #RECORD_45_CNT + 1
+end-procedure ! REPORT_WRITE_MD45_RECORD	
+
+begin-procedure REPORT_WRITE_MD90_RECORD
+SHOW 'REPORT_WRITE_MD90_RECORD'
+LET $RECORD_TYPE = '90'
+!LET $ANNUAL_SAL = '000000000'
+LET $CON_AGREE_EXIST_FLAG = 'Y'
+
+
+PRINT $TRS_DISTRICT (#LINE,1)
+PRINT $REPORT_TYPE (,5)
+PRINT $RECORD_TYPE (,7)
+PRINT $WS_SSN (,9) 
+PRINT $BIRTHDATE (,18)
+PRINT $SEX (,26) 
+PRINT $LAST_NAME (,27)  
+PRINT $FIRST_NAME (,52) 
+PRINT $GENERATION (,77)
+PRINT $MIDDLE_NAME (,81)
+PRINT $TERM_DATE (,106)
+PRINT $CON_AGREE_EXIST_FLAG (,114)
+PRINT $CUR_MON (,115)
+PRINT $CUR_YYYY (,117)
+PRINT $NUM_PAY_DAYS (,121)
+PRINT $ANNUAL_SAL (,124)
+PRINT $TERM_REA_CODE (,133)
+PRINT ' ' (,199)  
+!   WRITE 10 FROM '1899':4
+!                 'MD':2
+!				 '90':2 
+!				 $WS_SSN:9 
+!				 $BIRTHDATE:8
+!				 $SEX:1 
+!			     $LAST_NAME:25  
+!			     $FIRST_NAME:25 
+!				 $GENERATION:4
+!				 $MIDDLE_NAME:25
+!				 $TERM_DATE:8
+!				 $CON_AGREE_EXIST_FLAG:1
+!				 !$FINAL_MM:2
+!				 !$FINAL_YYYY:4
+!				 $CUR_MON:2
+!				 $CUR_YYYY:4
+!				 $NUM_PAY_DAYS:3
+!				 $ANNUAL_SAL:9
+!				 $TERM_REA_CODE:1
+!                 $FIL:67  
+				 
+!LET #MD90_LINE = #MD90_LINE+1
+LET #LINE = #LINE+1
+LET #RECORD_CNT = #RECORD_CNT + 1
+LET #RECORD_90_CNT = #RECORD_90_CNT + 1
+MOVE 00000000 TO #ANNUAL_SAL
+MOVE 000000000 TO $ANNUAL_SAL
+MOVE 00000000 TO $TERM_DATE
+MOVE 00000000 TO $TERM_DATE_MMDDYYYY
+MOVE '000' TO $NUM_PAY_DAYS
+MOVE 000 TO #PAY_DAYS
+end-procedure ! REPORT_WRITE_MD90_RECORD
+
+begin-procedure HEADER_WRITE
+!LET #RECORD_CNT = #RECORD_CNT+1
+let #RECORD_CNT = TRUNC(#RECORD_CNT,0)
+LET $BATCH_SEQ_NO = TO_CHAR(#RECORD_CNT)
+LET $BATCH_SEQ_NO = LPAD($BATCH_SEQ_NO,9,'0')
+LET $TOT_RECORD = $BATCH_SEQ_NO
+LET $RECORD_TYPE = '00'
+PRINT $TRS_DISTRICT (1,1)
+PRINT $REPORT_TYPE (1,5) 
+PRINT $RECORD_TYPE (1,7)
+PRINT $CUR_MON (1,9)
+PRINT $CUR_YYYY (1,11)
+PRINT $TOT_RECORD (1,15)
+PRINT ' ' (1,199)
+!WRITE 10 FROM '1899'
+!	               'RP'
+!				   '00'
+!				   $CUR_MON:2
+!				   $CUR_YYYY:4
+!   			   $TOT_RECORD:9
+!				   $TOT_SALARY:11
+!	               $FIL:177 
+
+end-procedure ! HEADER_WRITE		 			 
+begin-procedure REPORT_WRITE
+!MOVE &B.DED_CUR TO $DED_CUR 0000000000.00
+!MOVE &C.TOTAL_GROSS TO $TOTAL_GROSS 0000000000.00
+!MOVE &TOT_DED TO $tot_ded
+!MOVE &TOT_GRS TO $TOT_GRS
+!show 'ded-amt= ' $TOT_DED
+!show 'ded-grs= ' $TOT_GRS
+!LET #TOT_DED1 = #TOT_GRS * .064
+!SHOW $WS_SSN
+!SHOW #TOT_DED1
+!MOVE #TOT_DED1 TO $DED_CUR 000V00
+MOVE #TOT_DED TO $DED_CUR  000V00
+MOVE #TOT_GRS TO $TOTAL_GROSS 00000V00
+MOVE #TRS_PAY_BACK_DED TO $TRS_PAY_BACK_DED 0000V00
+UPPERCASE $LAST_NAME
+UPPERCASE $FIRST_NAME
+UPPERCASE $MIDDLE_NAME
+!MOVE #TOTAL_DED TO $DED_CUR 0000.0000000
+!DISPLAY 'HERE1= ' $TOT_GRS
+!MOVE #TOTAL_GROSS TO $TOTAL_GROSS 0000000
+WRITE 10 FROM $WS_SSN:9 
+              '1899    ':8  
+			  $LAST_NAME:17  
+			  $FIRST_NAME:13 
+              $MIDDLE_NAME:1   
+			  $TRS_PAY_BACK_FLAG:1 
+			  '00          ':12 
+			  $TOTAL_GROSS:7
+              $DED_CUR:5 
+			  $TRS_PAY_BACK_DED:6
+			  ' ':1      
+MOVE 00000 TO $DED_CUR
+MOVE 0000000 TO $TOTAL_GROSS	
+MOVE 00000 TO #TOT_DED
+MOVE 00000 TO #TOT_GRS	
+MOVE 00000 TO #TOT_DED1	
+MOVE ' ' TO $TRS_PAY_BACK_FLAG 
+MOVE 000000 TO #TRS_PAY_BACK_DED   
+!print &SSN (#LINE,1,9) ON-BREAK PRINT=CHANGE LEVEL=1
+!PRINT '1899' (,10,4)
+!print $NAME (,18,31)
+!PRINT &D.LAST_NAME (,18,17) 
+!PRINT &D.FIRST_NAME (,35,13)  
+!PRINT &D.MIDDLE_NAME (,48,1)  
+!PRINT '00' (,50,2)  
+!PRINT $TOTAL_GROSS (,62,7) EDIT  9999999
+!PRINT $DED_CUR (,69,5) EDIT 99999 
+LET #LINE = #LINE+1
+end-procedure ! REPORT_WRITE
+
+!***************************************************************
+!Include SQCs
+!****************************************************************
+#Include 'reset.sqc'     !Reset printer procedure
+#Include 'curdttim.sqc'  !Get-Current-DateTime procedure
+#Include 'datetime.sqc'  !Routines for date and time formatting
+#Include 'number.sqc'    !Routines to format numbers
+#Include 'stdapi.sqc'    !Update Process API1
+#include 'datemath.sqc'  !Routines for date calculation
+#Include 'runctl_pr.sqc' !Select-Parameters
+
