@@ -1,4 +1,4 @@
-![headshot](ProfilePicture.jpg)
+![headshot](ProfilePictureSized.jpg)
 
 # HelloWorld
 My first repository
