@@ -1,4 +1,4 @@
-![headshot](ProfilePicture.jpg)
+![headshot](ProfilePictureSized.jpg)
 
 # HelloWorld
 My first repository
@@ -14,3 +14,5 @@ My first repository
 - The main authors or maintainers of the project
 - A link to the license
 - Any additional acknowledgements
+- More practice
+# New Section
