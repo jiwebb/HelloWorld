@@ -1,5 +1,6 @@
 -- Add a new comment
 -- Add another comment
+-- Add another comment
 SELECT  DISTINCT CASE
        WHEN P1.PORTAL_LABEL IS NULL THEN ''
        WHEN P1.PORTAL_LABEL = 'Root' THEN ''

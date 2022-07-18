@@ -1,5 +1,6 @@
 -- Jimmy Webb (SCI)
 -- Message Catalog
+-- Made change
 
 set log    C:\TEMP\Message_Catalog_import.log;
 set input  C:\TEMP\Message_Catalog_export.dat;
